@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from ..model_settings import ModelSettings
 
 
-class ModelTracing(enum.Enum):
+class ModelTracing(enum.IntEnum):
     DISABLED = 0
     """Tracing is disabled entirely."""
 
