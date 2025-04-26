@@ -1,12 +1,11 @@
-from dataclasses import dataclass
+# Import our activity, passing it through the sandbox
 from datetime import timedelta
 from typing import AsyncIterator
 
 from temporalio import workflow
 
-# Import our activity, passing it through the sandbox
 with workflow.unsafe.imports_passed_through():
-    from agents import Agent, Runner, RunConfig, ModelProvider, Model, TResponseInputItem, ModelSettings, Tool, \
+    from agents import ModelProvider, Model, TResponseInputItem, ModelSettings, Tool, \
         AgentOutputSchemaBase, Handoff, ModelTracing, ModelResponse
     from .activities import get_model_response, ModelInput, GetModelResponseInput
     from agents.items import TResponseStreamEvent
@@ -51,17 +50,3 @@ class ModelStubProvider(ModelProvider):
         return ActivityModel(model_name)
 
 
-@workflow.defn
-class HelloWorldAgent:
-    @workflow.run
-    async def run(self, name: str) -> str:
-        # return await workflow.execute_activity(
-        #     say_hello, name, schedule_to_close_timeout=timedelta(seconds=5)
-        # )
-        agent = Agent(
-            name="Assistant",
-            instructions="You only respond in haikus.",
-        )
-        config = RunConfig(model_provider=ModelStubProvider())
-        result = await Runner.run(agent, input="Tell me about recursion in programming.", run_config=config)
-        return result.final_output

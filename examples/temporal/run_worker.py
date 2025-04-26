@@ -3,9 +3,10 @@ import concurrent.futures
 from temporalio.client import Client
 from temporalio.worker import Worker
 
+from examples.temporal.tools_workflow import ToolsWorkflow
 # Import the activity and workflow from our other files
 from .activities import get_model_response
-from .workflows import HelloWorldAgent
+from .hello_world_workflow import HelloWorldAgent
 
 
 async def main():
@@ -17,7 +18,7 @@ async def main():
         worker = Worker(
             client,
             task_queue="my-task-queue",
-            workflows=[HelloWorldAgent],
+            workflows=[HelloWorldAgent, ToolsWorkflow],
             activities=[get_model_response],
             activity_executor=activity_executor,
         )

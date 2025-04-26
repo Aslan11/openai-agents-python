@@ -5,7 +5,7 @@ from temporalio.client import Client
 from temporalio.common import WorkflowIDReusePolicy
 
 # Import the workflow from the previous code
-from .workflows import HelloWorldAgent
+from .hello_world_workflow import HelloWorldAgent
 
 
 async def main():
@@ -15,7 +15,8 @@ async def main():
     client = await Client.connect("localhost:7233")
 
     # Execute a workflow
-    result = await client.execute_workflow(HelloWorldAgent.run, "my name", id="my-workflow-id", task_queue="my-task-queue",
+    result = await client.execute_workflow(HelloWorldAgent.run, "Tell me about recursion in programming.",
+                                           id="my-workflow-id", task_queue="my-task-queue",
                                            id_reuse_policy=WorkflowIDReusePolicy.TERMINATE_IF_RUNNING)
 
     print(f"Result: {result}")
