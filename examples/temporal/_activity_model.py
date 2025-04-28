@@ -1,4 +1,5 @@
-# Import our activity, passing it through the sandbox
+from __future__ import annotations
+
 from datetime import timedelta
 from typing import AsyncIterator
 
