@@ -15,7 +15,6 @@ async def main():
 
     # Create client connected to server at the given address
     client = await Client.connect("localhost:7233",
-                                  # data_converter=pydantic_data_converter
                                   data_converter=agent_data_converter
                                   )
 

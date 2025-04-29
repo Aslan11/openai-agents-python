@@ -1,53 +1,82 @@
 from __future__ import annotations
 
 from datetime import timedelta
-from typing import AsyncIterator
+from idlelib.query import Query
+from typing import Union, Optional, List, Literal, Iterable, Callable, Any
+from wsgiref.headers import Headers
 
+import httpx
+from fastapi import Body
+from openai import NotGiven, NOT_GIVEN, AsyncStream
+from openai.types import ResponsesModel, Metadata, Reasoning
+from openai.types.responses import ResponseInputParam, ResponseIncludable, ResponseTextConfigParam, \
+    response_create_params, ToolParam, Response, ResponseStreamEvent
 from temporalio import workflow
 
+from agents.function_schema import function_schema
+from agents.models.openai_provider import DEFAULT_MODEL
+from agents.models.openai_responses import OpenAIInvoker
+
 with workflow.unsafe.imports_passed_through():
-    from agents import ModelProvider, Model, TResponseInputItem, ModelSettings, Tool, \
-        AgentOutputSchemaBase, Handoff, ModelTracing, ModelResponse
-    from .activities import get_model_response, ModelInput, GetModelResponseInput
-    from agents.items import TResponseStreamEvent
+    from agents import ModelProvider, Model, OpenAIResponsesModel, Tool, RunContextWrapper, FunctionTool
+    from examples.temporal.activities import OpenAIActivityInput, invoke_open_ai_model
 
 
-class ActivityModel(Model):
+class _OpenAIActivityInvoker(OpenAIInvoker):
 
-    def __init__(self, model_name: str):
-        self.model_name = model_name
-
-    async def get_response(
-            self,
-            system_instructions: str | None,
-            input: str | list[TResponseInputItem],
-            model_settings: ModelSettings,
-            tools: list[Tool],
-            output_schema: AgentOutputSchemaBase | None,
-            handoffs: list[Handoff],
-            tracing: ModelTracing,
-            *,
-            previous_response_id: str | None,
-    ) -> ModelResponse:
-        model_input = ModelInput(system_instructions=system_instructions, input=input,
-                                 model_settings=model_settings,
-                                 tools=tools, output_schema=output_schema, handoffs=handoffs, tracing=tracing,
-                                 previous_response_id=previous_response_id)
-        # tracing = tracing,
+    async def create(self, *, input: Union[str, ResponseInputParam], model: ResponsesModel,
+                     include: Optional[List[ResponseIncludable]] | NotGiven = NOT_GIVEN,
+                     instructions: Optional[str] | NotGiven = NOT_GIVEN,
+                     max_output_tokens: Optional[int] | NotGiven = NOT_GIVEN,
+                     metadata: Optional[Metadata] | NotGiven = NOT_GIVEN,
+                     parallel_tool_calls: Optional[bool] | NotGiven = NOT_GIVEN,
+                     previous_response_id: Optional[str] | NotGiven = NOT_GIVEN,
+                     reasoning: Optional[Reasoning] | NotGiven = NOT_GIVEN,
+                     service_tier: Optional[Literal["auto", "default", "flex"]] | NotGiven = NOT_GIVEN,
+                     store: Optional[bool] | NotGiven = NOT_GIVEN,
+                     stream: Optional[Literal[False]] | Literal[True] | NotGiven = NOT_GIVEN,
+                     temperature: Optional[float] | NotGiven = NOT_GIVEN,
+                     text: ResponseTextConfigParam | NotGiven = NOT_GIVEN,
+                     tool_choice: response_create_params.ToolChoice | NotGiven = NOT_GIVEN,
+                     tools: Iterable[ToolParam] | NotGiven = NOT_GIVEN, top_p: Optional[float] | NotGiven = NOT_GIVEN,
+                     truncation: Optional[Literal["auto", "disabled"]] | NotGiven = NOT_GIVEN,
+                     user: str | NotGiven = NOT_GIVEN, extra_headers: Headers | None = None,
+                     extra_query: Query | None = None, extra_body: Body | None = None,
+                     timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN) -> Response | AsyncStream[
+        ResponseStreamEvent]:
+        input = OpenAIActivityInput(input=input, model=model, include=include, instructions=instructions,
+                                    max_output_tokens=max_output_tokens, metadata=metadata,
+                                    parallel_tool_calls=parallel_tool_calls, previous_response_id=previous_response_id,
+                                    reasoning=reasoning, service_tier=service_tier, store=store, stream=stream,
+                                    temperature=temperature, text=text, tool_choice=tool_choice, tools=tools,
+                                    top_p=top_p, truncation=truncation, user=user, extra_headers=extra_headers,
+                                    extra_query=extra_query, extra_body=extra_body, timeout=timeout)
         return await workflow.execute_activity(
-            get_model_response, GetModelResponseInput(self.model_name, model_input),
+            invoke_open_ai_model, input,
             start_to_close_timeout=timedelta(seconds=5)
         )
-
-    def stream_response(self, system_instructions: str | None, input: str | list[TResponseInputItem],
-                        model_settings: ModelSettings, tools: list[Tool], output_schema: AgentOutputSchemaBase | None,
-                        handoffs: list[Handoff], tracing: ModelTracing, *, previous_response_id: str | None) -> \
-            AsyncIterator[TResponseStreamEvent]:
-        raise NotImplementedError()
 
 
 class ModelStubProvider(ModelProvider):
     def get_model(self, model_name: str | None) -> Model:
-        return ActivityModel(model_name)
+        if model_name is None:
+            model_name = DEFAULT_MODEL
+        return OpenAIResponsesModel(model_name, _OpenAIActivityInvoker())
 
+def activity_as_tool(activity: Callable[..., Any]) -> Tool:
+    async def run_activity(ctx: RunContextWrapper[Any], input: str) -> Any:
+        return str(await workflow.execute_activity(
+            activity,
+            input,
+            start_to_close_timeout=timedelta(seconds=10),
+        ))
+
+    schema = function_schema(activity)
+    return FunctionTool(
+        name=schema.name,
+        description=schema.description or "",
+        params_json_schema=schema.params_json_schema,
+        on_invoke_tool=run_activity,
+        strict_json_schema=True,
+    )
 

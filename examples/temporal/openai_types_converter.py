@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import dataclasses
 from inspect import isclass
-from typing import Any, cast, Type, Union, Optional, Callable, Awaitable
+from typing import Any, cast, Type, Union, Optional, Callable, Awaitable, get_origin, get_args
 
+from openai import NotGiven
 from temporalio.converter import AdvancedJSONEncoder, JSONTypeConverter, _JSONTypeConverterUnhandled, \
     CompositePayloadConverter, DefaultPayloadConverter, DataConverter, JSONPlainPayloadConverter
 
@@ -12,18 +13,8 @@ from agents import Tool, FunctionTool, RunContextWrapper
 
 class ToolsJSONEncoder(AdvancedJSONEncoder):
     def default(self, o: Any) -> Any:
-        print(f"ToolsJSONEncoder: {o}")
-        if isinstance(o, FunctionTool):
-            t = cast(FunctionTool, o)
-            return {
-                "name": t.name,
-                "description": t.description,
-                "params_json_schema": super().default(t.params_json_schema),
-                "strict_json_schema": super().default(t.strict_json_schema),
-            }
-        if isinstance(o, Callable):
-            # This is a function or method, so we can return its name
-            return o.__name__
+        if isinstance(o, NotGiven):
+            return "NOT_GIVEN"
         return super().default(o)
 
 
@@ -35,15 +26,10 @@ class ToolsJSONTypeConverter(JSONTypeConverter):
     def to_typed_value(
             self, hint: Type, value: Any
     ) -> Union[Optional[Any], _JSONTypeConverterUnhandled]:
-        if isclass(hint):
-            if issubclass(hint, Tool):
-                return FunctionTool(name=value["name"],
-                                    description=value["description"],
-                                    params_json_schema=value["params_json_schema"],
-                                    strict_json_schema=value["strict_json_schema"],
-                                    on_invoke_tool=empty)
-            if issubclass(hint, Callable):
-                return empty
+        if hint is object:
+            return value
+        if value == "NOT_GIVEN":
+            return NotGiven()
         return JSONTypeConverter.Unhandled
 
 

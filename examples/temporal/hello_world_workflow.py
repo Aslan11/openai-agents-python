@@ -1,10 +1,10 @@
 from temporalio import workflow
 
-from examples.temporal._activity_model import ModelStubProvider
 
 # Import our activity, passing it through the sandbox
 with workflow.unsafe.imports_passed_through():
     from agents import Agent, Runner, RunConfig
+    from examples.temporal._activity_model import ModelStubProvider
 
 
 @workflow.defn
