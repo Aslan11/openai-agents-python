@@ -5,6 +5,8 @@ from inspect import isclass
 from typing import Any, cast, Type, Union, Optional, Callable, Awaitable, get_origin, get_args
 
 from openai import NotGiven
+from openai._models import TypeAdapter
+from openai.types.responses import Response
 from temporalio.converter import AdvancedJSONEncoder, JSONTypeConverter, _JSONTypeConverterUnhandled, \
     CompositePayloadConverter, DefaultPayloadConverter, DataConverter, JSONPlainPayloadConverter
 
@@ -28,6 +30,9 @@ class ToolsJSONTypeConverter(JSONTypeConverter):
     ) -> Union[Optional[Any], _JSONTypeConverterUnhandled]:
         if hint is object:
             return value
+        # if hint is Response:
+        #     return Response.model_validate(value)
+        #     # return TypeAdapter(hint).validate_python(value)
         if value == "NOT_GIVEN":
             return NotGiven()
         return JSONTypeConverter.Unhandled

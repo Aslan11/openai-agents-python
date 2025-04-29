@@ -20,5 +20,5 @@ class ToolsWorkflow:
         )
 
         config = RunConfig(model_provider=ModelStubProvider())
-        result = await Runner.run(agent, input="What's the weather in Tokyo?", run_config=config)
+        result = await Runner.run(agent, input=question, run_config=config)
         return result.final_output

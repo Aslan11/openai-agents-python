@@ -51,10 +51,11 @@ class _OpenAIActivityInvoker(OpenAIInvoker):
                                     temperature=temperature, text=text, tool_choice=tool_choice, tools=tools,
                                     top_p=top_p, truncation=truncation, user=user, extra_headers=extra_headers,
                                     extra_query=extra_query, extra_body=extra_body, timeout=timeout)
-        return await workflow.execute_activity(
+        response_json = await workflow.execute_activity(
             invoke_open_ai_model, input,
-            start_to_close_timeout=timedelta(seconds=5)
+            start_to_close_timeout=timedelta(seconds=30)
         )
+        return Response.model_validate_json(response_json)
 
 
 class ModelStubProvider(ModelProvider):

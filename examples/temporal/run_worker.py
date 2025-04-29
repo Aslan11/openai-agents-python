@@ -8,6 +8,7 @@ from temporalio.worker import Worker
 
 from examples.temporal.activities import invoke_open_ai_model, get_weather
 from examples.temporal.openai_types_converter import agent_data_converter
+from examples.temporal.research_bot_workflow import ResearchWorkflow
 from examples.temporal.tools_workflow import ToolsWorkflow
 # Import the activity and workflow from our other files
 from .hello_world_workflow import HelloWorldAgent
@@ -23,7 +24,7 @@ async def main():
         worker = Worker(
             client,
             task_queue="my-task-queue",
-            workflows=[HelloWorldAgent, ToolsWorkflow],
+            workflows=[HelloWorldAgent, ToolsWorkflow, ResearchWorkflow],
             activities=[invoke_open_ai_model, get_weather],
             activity_executor=activity_executor,
         )

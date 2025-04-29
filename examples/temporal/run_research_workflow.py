@@ -5,8 +5,7 @@ from temporalio.client import Client
 from temporalio.common import WorkflowIDReusePolicy
 
 from examples.temporal.openai_types_converter import agent_data_converter
-from examples.temporal.tools_workflow import ToolsWorkflow
-
+from examples.temporal.research_bot_workflow import ResearchWorkflow
 
 async def main():
     logging.basicConfig(level=logging.DEBUG)
@@ -18,7 +17,9 @@ async def main():
     )
 
     # Execute a workflow
-    result = await client.execute_workflow(ToolsWorkflow.run, "What is the weather in Tokio?", id="tools-workflow",
+    result = await client.execute_workflow(ResearchWorkflow.run,
+                                           "Caribbean vacation spots in April, optimizing for surfing, hiking and water sports",
+                                           id="research-workflow",
                                            task_queue="my-task-queue",
                                            id_reuse_policy=WorkflowIDReusePolicy.TERMINATE_IF_RUNNING)
 

@@ -69,9 +69,10 @@ class OpenAIActivityInput(TypedDict, total=False):
 
 
 @activity.defn
-async def invoke_open_ai_model(input: OpenAIActivityInput) -> Response:
+async def invoke_open_ai_model(input: OpenAIActivityInput) -> str:
     client = AsyncOpenAI()
-    return await client.responses.create(**input)
+    response = await client.responses.create(**input)
+    return response.to_json()
 
 @dataclass
 class Weather:
