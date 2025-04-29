@@ -23,7 +23,7 @@ class ResearchManager:
         self.writer_agent = new_writer_agent()
 
 
-    async def run(self, query: str) -> None:
+    async def run(self, query: str) -> str:
         trace_id = gen_trace_id()
         with trace("Research trace", trace_id=trace_id):
             self.printer.update_item(
@@ -53,6 +53,7 @@ class ResearchManager:
         print("\n\n=====FOLLOW UP QUESTIONS=====\n\n")
         follow_up_questions = "\n".join(report.follow_up_questions)
         print(f"Follow up questions: {follow_up_questions}")
+        return report.markdown_report
 
 
     async def _plan_searches(self, query: str) -> WebSearchPlan:

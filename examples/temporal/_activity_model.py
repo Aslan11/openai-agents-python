@@ -22,9 +22,25 @@ with workflow.unsafe.imports_passed_through():
     from examples.temporal.activities import OpenAIActivityInput, invoke_open_ai_model
 
 
+def get_summary(input: Any) -> str:
+    try:
+        max_size = 100
+        if isinstance(input, str):
+            return input[:max_size]
+        elif isinstance(input, list):
+            return input[-1].get("content", "")[:max_size]
+        elif isinstance(input, dict):
+            return input.get("content", "")[:max_size]
+    except Exception as e:
+        print(f"Error getting summary: {e}")
+    return ""
+
+
 class _OpenAIActivityInvoker(OpenAIInvoker):
 
-    async def create(self, *, input: Union[str, ResponseInputParam], model: ResponsesModel,
+    async def create(self, *,
+                     input: Union[str, ResponseInputParam],
+                     model: ResponsesModel,
                      include: Optional[List[ResponseIncludable]] | NotGiven = NOT_GIVEN,
                      instructions: Optional[str] | NotGiven = NOT_GIVEN,
                      max_output_tokens: Optional[int] | NotGiven = NOT_GIVEN,
@@ -44,7 +60,7 @@ class _OpenAIActivityInvoker(OpenAIInvoker):
                      extra_query: Query | None = None, extra_body: Body | None = None,
                      timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN) -> Response | AsyncStream[
         ResponseStreamEvent]:
-        input = OpenAIActivityInput(input=input, model=model, include=include, instructions=instructions,
+        activity_input = OpenAIActivityInput(input=input, model=model, include=include, instructions=instructions,
                                     max_output_tokens=max_output_tokens, metadata=metadata,
                                     parallel_tool_calls=parallel_tool_calls, previous_response_id=previous_response_id,
                                     reasoning=reasoning, service_tier=service_tier, store=store, stream=stream,
@@ -52,8 +68,9 @@ class _OpenAIActivityInvoker(OpenAIInvoker):
                                     top_p=top_p, truncation=truncation, user=user, extra_headers=extra_headers,
                                     extra_query=extra_query, extra_body=extra_body, timeout=timeout)
         response_json = await workflow.execute_activity(
-            invoke_open_ai_model, input,
-            start_to_close_timeout=timedelta(seconds=30)
+            invoke_open_ai_model, activity_input,
+            start_to_close_timeout=timedelta(seconds=30),
+            summary=get_summary(input)
         )
         return Response.model_validate_json(response_json)
 
@@ -63,6 +80,7 @@ class ModelStubProvider(ModelProvider):
         if model_name is None:
             model_name = DEFAULT_MODEL
         return OpenAIResponsesModel(model_name, _OpenAIActivityInvoker())
+
 
 def activity_as_tool(activity: Callable[..., Any]) -> Tool:
     async def run_activity(ctx: RunContextWrapper[Any], input: str) -> Any:
@@ -80,4 +98,3 @@ def activity_as_tool(activity: Callable[..., Any]) -> Tool:
         on_invoke_tool=run_activity,
         strict_json_schema=True,
     )
-
