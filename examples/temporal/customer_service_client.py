@@ -1,13 +1,12 @@
 import argparse
 import asyncio
-import logging
 
 from temporalio.client import Client, WorkflowQueryRejectedError
 from temporalio.common import WorkflowIDReusePolicy, QueryRejectCondition
 from temporalio.service import RPCError, RPCStatusCode
 
-from examples.temporal.customer_service_workflow import CustomerServiceWorkflow
-from examples.temporal.open_ai_converter import open_ai_data_converter
+from examples.temporal.workflows.customer_service_workflow import CustomerServiceWorkflow
+from examples.temporal.adapters.open_ai_converter import open_ai_data_converter
 
 
 async def main():

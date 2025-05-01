@@ -6,11 +6,11 @@ import asyncio
 from rich.console import Console
 
 from agents import Runner, custom_span, gen_trace_id, trace, RunConfig
-from ._activity_model import ModelStubProvider
-from .research_agents.planner_agent import WebSearchPlan, WebSearchItem, new_planner_agent
-from .research_agents.search_agent import new_search_agent
-from .research_agents.writer_agent import ReportData, new_writer_agent
-from ..research_bot.printer import Printer
+from examples.temporal.adapters.activity_model import ModelStubProvider
+from examples.temporal.workflows.research_agents.planner_agent import WebSearchPlan, WebSearchItem, new_planner_agent
+from examples.temporal.workflows.research_agents.search_agent import new_search_agent
+from examples.temporal.workflows.research_agents.writer_agent import ReportData, new_writer_agent
+from examples.research_bot.printer import Printer
 
 
 class ResearchManager:

@@ -4,8 +4,8 @@ import logging
 from temporalio.client import Client
 from temporalio.common import WorkflowIDReusePolicy
 
-from examples.temporal.open_ai_converter import open_ai_data_converter
-from examples.temporal.tools_workflow import ToolsWorkflow
+from examples.temporal.adapters.open_ai_converter import open_ai_data_converter
+from examples.temporal.workflows.tools_workflow import ToolsWorkflow
 
 
 async def main():

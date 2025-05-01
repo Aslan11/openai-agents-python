@@ -2,9 +2,10 @@
 
 from temporalio import workflow
 
+
 with workflow.unsafe.imports_passed_through():
-    from examples.temporal._activity_model import ModelStubProvider
     from pydantic import BaseModel
+    from examples.temporal.adapters.activity_model import ModelStubProvider
     from agents import (
         Agent,
         HandoffOutputItem,

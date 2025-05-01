@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from typing import Union, Optional, List, Literal, Iterable, TypedDict
 
 import httpx
@@ -7,41 +6,10 @@ from openai._types import Headers, Query, Body
 from openai.types import ResponsesModel, Metadata, Reasoning
 from openai.types.responses import ResponseInputParam, ResponseIncludable, ResponseTextConfigParam, \
     response_create_params, ToolParam, Response
+
 from temporalio import activity
 
-from examples.basic.tools import Weather
 
-
-# @dataclass
-# class ModelInput:
-#     system_instructions: str | None
-#     input: str | list[TResponseInputItem]
-#     model_settings: ModelSettings
-#     tools: list[Tool]
-#     output_schema: AgentOutputSchemaBase | None
-#     handoffs: list[Handoff]
-#     tracing: ModelTracing
-#     previous_response_id: str | None
-#
-#
-# @dataclass
-# class GetModelResponseInput:
-#     model_name: str | None
-#     model_input: ModelInput
-#
-
-# @activity.defn
-# async def get_model_response(input: GetModelResponseInput) -> ModelResponse:
-#     provider = OpenAIProvider()
-#     model = provider.get_model(input.model_name)
-#     return await model.get_response(**vars(input.model_input))
-
-@activity.defn
-async def get_weather(city: str) -> Weather:
-    print("[debug] get_weather called")
-    return Weather(city=city, temperature_range="14-20C", conditions="Sunny with wind.")
-
-# @dataclass
 class OpenAIActivityInput(TypedDict, total=False):
     input: Union[str, ResponseInputParam]
     model: ResponsesModel
@@ -72,16 +40,3 @@ class OpenAIActivityInput(TypedDict, total=False):
 async def invoke_open_ai_model(input: OpenAIActivityInput) -> Response:
     client = AsyncOpenAI()
     return await client.responses.create(**input)
-
-@dataclass
-class Weather:
-    city: str
-    temperature_range: str
-    conditions: str
-
-@activity.defn
-async def get_weather(city: str) -> Weather:
-    """
-    Get the weather for a given city.
-    """
-    return Weather(city=city, temperature_range="14-20C", conditions="Sunny with wind.")

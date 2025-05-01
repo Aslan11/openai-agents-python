@@ -3,11 +3,10 @@ import logging
 
 from temporalio.client import Client
 from temporalio.common import WorkflowIDReusePolicy
-from temporalio.contrib.pydantic import pydantic_data_converter
 
-from examples.temporal.open_ai_converter import open_ai_data_converter
+from examples.temporal.adapters.open_ai_converter import open_ai_data_converter
 # Import the workflow from the previous code
-from .hello_world_workflow import HelloWorldAgent
+from examples.temporal.workflows.hello_world_workflow import HelloWorldAgent
 
 
 async def main():
