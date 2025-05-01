@@ -5,7 +5,7 @@ from temporalio.client import Client
 from temporalio.common import WorkflowIDReusePolicy
 from temporalio.contrib.pydantic import pydantic_data_converter
 
-from examples.temporal.openai_types_converter import agent_data_converter
+from examples.temporal.open_ai_converter import open_ai_data_converter
 # Import the workflow from the previous code
 from .hello_world_workflow import HelloWorldAgent
 
@@ -15,7 +15,7 @@ async def main():
 
     # Create client connected to server at the given address
     client = await Client.connect("localhost:7233",
-                                  data_converter=agent_data_converter
+                                  data_converter=open_ai_data_converter,
                                   )
 
     # Execute a workflow

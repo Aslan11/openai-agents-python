@@ -1,10 +1,9 @@
-from __future__ import annotations as _annotations
+# from __future__ import annotations as _annotations
 
 from temporalio import workflow
 
-from examples.temporal._activity_model import ModelStubProvider
-
 with workflow.unsafe.imports_passed_through():
+    from examples.temporal._activity_model import ModelStubProvider
     from pydantic import BaseModel
     from agents import (
         Agent,
@@ -148,7 +147,7 @@ class CustomerServiceWorkflow:
 
     @workflow.run
     async def run(self, input_items: list[TResponseInputItem] = None):
-        input_items = input_items or []
+        input_items = [] #input_items or []
         current_agent: Agent[AirlineAgentContext] = init_agents()
         context = AirlineAgentContext()
         while not workflow.info().is_continue_as_new_suggested():

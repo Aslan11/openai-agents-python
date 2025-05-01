@@ -7,18 +7,16 @@ from temporalio.common import WorkflowIDReusePolicy, QueryRejectCondition
 from temporalio.service import RPCError, RPCStatusCode
 
 from examples.temporal.customer_service_workflow import CustomerServiceWorkflow
-from examples.temporal.openai_types_converter import agent_data_converter
+from examples.temporal.open_ai_converter import open_ai_data_converter
 
 
 async def main():
-    logging.basicConfig(level=logging.DEBUG)
-
     parser = argparse.ArgumentParser()
     parser.add_argument('--conversation-id', type=str, required=True)
     args = parser.parse_args()
 
     # Create client connected to server at the given address
-    client = await Client.connect("localhost:7233", data_converter=agent_data_converter)
+    client = await Client.connect("localhost:7233", data_converter=open_ai_data_converter)
 
     handle = client.get_workflow_handle(args.conversation_id)
 
@@ -29,7 +27,7 @@ async def main():
         history = await handle.query(CustomerServiceWorkflow.get_chat_history,
                                      reject_condition=QueryRejectCondition.NOT_OPEN)
     except WorkflowQueryRejectedError as e:
-       start = True
+        start = True
     except RPCError as e:
         if e.status == RPCStatusCode.NOT_FOUND:
             start = True
@@ -47,7 +45,6 @@ async def main():
         user_input = input("Enter your message: ")
         new_history = await handle.execute_update(CustomerServiceWorkflow.process_user_message, user_input)
         print(*new_history, sep="\n")
-
 
 
 if __name__ == "__main__":

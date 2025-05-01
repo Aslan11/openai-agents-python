@@ -23,6 +23,7 @@ with workflow.unsafe.imports_passed_through():
 
 
 def get_summary(input: Any) -> str:
+    ### Activity summary shown in the UI
     try:
         max_size = 100
         if isinstance(input, str):
@@ -67,13 +68,11 @@ class _OpenAIActivityInvoker(OpenAIInvoker):
                                     temperature=temperature, text=text, tool_choice=tool_choice, tools=tools,
                                     top_p=top_p, truncation=truncation, user=user, extra_headers=extra_headers,
                                     extra_query=extra_query, extra_body=extra_body, timeout=timeout)
-        response_json = await workflow.execute_activity(
+        return await workflow.execute_activity(
             invoke_open_ai_model, activity_input,
-            start_to_close_timeout=timedelta(seconds=30),
+            start_to_close_timeout=timedelta(seconds=60),
             summary=get_summary(input)
         )
-        return Response.model_validate_json(response_json)
-
 
 class ModelStubProvider(ModelProvider):
     def get_model(self, model_name: str | None) -> Model:
