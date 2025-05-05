@@ -3,15 +3,10 @@ from __future__ import annotations
 import json
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from idlelib.query import Query
-from typing import TYPE_CHECKING, Any, Literal, overload, Protocol, Union, Optional, List, Iterable
-from wsgiref.headers import Headers
+from typing import TYPE_CHECKING, Any, Literal, overload
 
-import httpx
-from fastapi import Body
 from openai import NOT_GIVEN, APIStatusError, AsyncOpenAI, AsyncStream, NotGiven
-from openai._utils import required_args
-from openai.types import ChatModel, ResponsesModel, Metadata, Reasoning
+from openai.types import ChatModel
 from openai.types.responses import (
     Response,
     ResponseCompletedEvent,
@@ -19,7 +14,7 @@ from openai.types.responses import (
     ResponseTextConfigParam,
     ToolParam,
     WebSearchToolParam,
-    response_create_params, ResponseInputParam, ResponseIncludable,
+    response_create_params,
 )
 
 from .. import _debug
@@ -37,6 +32,7 @@ from .interface import Model, ModelTracing
 if TYPE_CHECKING:
     from ..model_settings import ModelSettings
 
+
 _USER_AGENT = f"Agents/Python {__version__}"
 _HEADERS = {"User-Agent": _USER_AGENT}
 
@@ -48,103 +44,32 @@ IncludeLiteral = Literal[
 ]
 
 
-class OpenAIInvoker(Protocol):
-    @required_args(["input", "model"], ["input", "model", "stream"])
-    async def create(
-            self,
-            *,
-            input: Union[str, ResponseInputParam],
-            model: ResponsesModel,
-            include: Optional[List[ResponseIncludable]] | NotGiven = NOT_GIVEN,
-            instructions: Optional[str] | NotGiven = NOT_GIVEN,
-            max_output_tokens: Optional[int] | NotGiven = NOT_GIVEN,
-            metadata: Optional[Metadata] | NotGiven = NOT_GIVEN,
-            parallel_tool_calls: Optional[bool] | NotGiven = NOT_GIVEN,
-            previous_response_id: Optional[str] | NotGiven = NOT_GIVEN,
-            reasoning: Optional[Reasoning] | NotGiven = NOT_GIVEN,
-            service_tier: Optional[Literal["auto", "default", "flex"]] | NotGiven = NOT_GIVEN,
-            store: Optional[bool] | NotGiven = NOT_GIVEN,
-            stream: Optional[Literal[False]] | Literal[True] | NotGiven = NOT_GIVEN,
-            temperature: Optional[float] | NotGiven = NOT_GIVEN,
-            text: ResponseTextConfigParam | NotGiven = NOT_GIVEN,
-            tool_choice: response_create_params.ToolChoice | NotGiven = NOT_GIVEN,
-            tools: Iterable[ToolParam] | NotGiven = NOT_GIVEN,
-            top_p: Optional[float] | NotGiven = NOT_GIVEN,
-            truncation: Optional[Literal["auto", "disabled"]] | NotGiven = NOT_GIVEN,
-            user: str | NotGiven = NOT_GIVEN,
-            # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
-            # The extra values given here take precedence over values defined on the client or passed to this method.
-            extra_headers: Headers | None = None,
-            extra_query: Query | None = None,
-            extra_body: Body | None = None,
-            timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
-    ) -> Response | AsyncStream[ResponseStreamEvent]:
-        ...
-
-
-class OpenAIModelInvoker(OpenAIInvoker):
-    def __init__(self, client: AsyncOpenAI) -> None:
-        self._client = client
-
-    async def create(self, *, input: Union[str, ResponseInputParam], model: ResponsesModel,
-                     include: Optional[List[ResponseIncludable]] | NotGiven = NOT_GIVEN,
-                     instructions: Optional[str] | NotGiven = NOT_GIVEN,
-                     max_output_tokens: Optional[int] | NotGiven = NOT_GIVEN,
-                     metadata: Optional[Metadata] | NotGiven = NOT_GIVEN,
-                     parallel_tool_calls: Optional[bool] | NotGiven = NOT_GIVEN,
-                     previous_response_id: Optional[str] | NotGiven = NOT_GIVEN,
-                     reasoning: Optional[Reasoning] | NotGiven = NOT_GIVEN,
-                     service_tier: Optional[Literal["auto", "default", "flex"]] | NotGiven = NOT_GIVEN,
-                     store: Optional[bool] | NotGiven = NOT_GIVEN,
-                     stream: Optional[Literal[False]] | Literal[True] | NotGiven = NOT_GIVEN,
-                     temperature: Optional[float] | NotGiven = NOT_GIVEN,
-                     text: ResponseTextConfigParam | NotGiven = NOT_GIVEN,
-                     tool_choice: response_create_params.ToolChoice | NotGiven = NOT_GIVEN,
-                     tools: Iterable[ToolParam] | NotGiven = NOT_GIVEN, top_p: Optional[float] | NotGiven = NOT_GIVEN,
-                     truncation: Optional[Literal["auto", "disabled"]] | NotGiven = NOT_GIVEN,
-                     user: str | NotGiven = NOT_GIVEN, extra_headers: Headers | None = None,
-                     extra_query: Query | None = None, extra_body: Body | None = None,
-                     timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN) -> Response | AsyncStream[
-        ResponseStreamEvent]:
-        return await self._client.responses.create(input=input, model=model, include=include, instructions=instructions,
-                                                   max_output_tokens=max_output_tokens, metadata=metadata,
-                                                   parallel_tool_calls=parallel_tool_calls,
-                                                   previous_response_id=previous_response_id,
-                                                   reasoning=reasoning, service_tier=service_tier, store=store,
-                                                   stream=stream,
-                                                   temperature=temperature, text=text, tool_choice=tool_choice,
-                                                   tools=tools,
-                                                   top_p=top_p, truncation=truncation, user=user,
-                                                   extra_headers=extra_headers,
-                                                   extra_query=extra_query, extra_body=extra_body, timeout=timeout)
-
-
 class OpenAIResponsesModel(Model):
     """
     Implementation of `Model` that uses the OpenAI Responses API.
     """
 
     def __init__(
-            self,
-            model: str | ChatModel,
-            openai_client: OpenAIInvoker | AsyncOpenAI,
+        self,
+        model: str | ChatModel,
+        openai_client: AsyncOpenAI,
     ) -> None:
         self.model = model
-        self._client = OpenAIModelInvoker(openai_client) if isinstance(openai_client, AsyncOpenAI) else openai_client
+        self._client = openai_client
 
     def _non_null_or_not_given(self, value: Any) -> Any:
         return value if value is not None else NOT_GIVEN
 
     async def get_response(
-            self,
-            system_instructions: str | None,
-            input: str | list[TResponseInputItem],
-            model_settings: ModelSettings,
-            tools: list[Tool],
-            output_schema: AgentOutputSchemaBase | None,
-            handoffs: list[Handoff],
-            tracing: ModelTracing,
-            previous_response_id: str | None,
+        self,
+        system_instructions: str | None,
+        input: str | list[TResponseInputItem],
+        model_settings: ModelSettings,
+        tools: list[Tool],
+        output_schema: AgentOutputSchemaBase | None,
+        handoffs: list[Handoff],
+        tracing: ModelTracing,
+        previous_response_id: str | None,
     ) -> ModelResponse:
         with response_span(disabled=tracing.is_disabled()) as span_response:
             try:
@@ -201,15 +126,15 @@ class OpenAIResponsesModel(Model):
         )
 
     async def stream_response(
-            self,
-            system_instructions: str | None,
-            input: str | list[TResponseInputItem],
-            model_settings: ModelSettings,
-            tools: list[Tool],
-            output_schema: AgentOutputSchemaBase | None,
-            handoffs: list[Handoff],
-            tracing: ModelTracing,
-            previous_response_id: str | None,
+        self,
+        system_instructions: str | None,
+        input: str | list[TResponseInputItem],
+        model_settings: ModelSettings,
+        tools: list[Tool],
+        output_schema: AgentOutputSchemaBase | None,
+        handoffs: list[Handoff],
+        tracing: ModelTracing,
+        previous_response_id: str | None,
     ) -> AsyncIterator[ResponseStreamEvent]:
         """
         Yields a partial message as it is generated, as well as the usage information.
@@ -252,42 +177,40 @@ class OpenAIResponsesModel(Model):
 
     @overload
     async def _fetch_response(
-            self,
-            system_instructions: str | None,
-            input: str | list[TResponseInputItem],
-            model_settings: ModelSettings,
-            tools: list[Tool],
-            output_schema: AgentOutputSchemaBase | None,
-            handoffs: list[Handoff],
-            previous_response_id: str | None,
-            stream: Literal[True],
-    ) -> AsyncStream[ResponseStreamEvent]:
-        ...
+        self,
+        system_instructions: str | None,
+        input: str | list[TResponseInputItem],
+        model_settings: ModelSettings,
+        tools: list[Tool],
+        output_schema: AgentOutputSchemaBase | None,
+        handoffs: list[Handoff],
+        previous_response_id: str | None,
+        stream: Literal[True],
+    ) -> AsyncStream[ResponseStreamEvent]: ...
 
     @overload
     async def _fetch_response(
-            self,
-            system_instructions: str | None,
-            input: str | list[TResponseInputItem],
-            model_settings: ModelSettings,
-            tools: list[Tool],
-            output_schema: AgentOutputSchemaBase | None,
-            handoffs: list[Handoff],
-            previous_response_id: str | None,
-            stream: Literal[False],
-    ) -> Response:
-        ...
+        self,
+        system_instructions: str | None,
+        input: str | list[TResponseInputItem],
+        model_settings: ModelSettings,
+        tools: list[Tool],
+        output_schema: AgentOutputSchemaBase | None,
+        handoffs: list[Handoff],
+        previous_response_id: str | None,
+        stream: Literal[False],
+    ) -> Response: ...
 
     async def _fetch_response(
-            self,
-            system_instructions: str | None,
-            input: str | list[TResponseInputItem],
-            model_settings: ModelSettings,
-            tools: list[Tool],
-            output_schema: AgentOutputSchemaBase | None,
-            handoffs: list[Handoff],
-            previous_response_id: str | None,
-            stream: Literal[True] | Literal[False] = False,
+        self,
+        system_instructions: str | None,
+        input: str | list[TResponseInputItem],
+        model_settings: ModelSettings,
+        tools: list[Tool],
+        output_schema: AgentOutputSchemaBase | None,
+        handoffs: list[Handoff],
+        previous_response_id: str | None,
+        stream: Literal[True] | Literal[False] = False,
     ) -> Response | AsyncStream[ResponseStreamEvent]:
         list_input = ItemHelpers.input_to_new_input_list(input)
 
@@ -316,7 +239,7 @@ class OpenAIResponsesModel(Model):
                 f"Previous response id: {previous_response_id}\n"
             )
 
-        return await self._client.create(
+        return await self._client.responses.create(
             previous_response_id=self._non_null_or_not_given(previous_response_id),
             instructions=self._non_null_or_not_given(system_instructions),
             model=self.model,
@@ -341,7 +264,7 @@ class OpenAIResponsesModel(Model):
 
     def _get_client(self) -> AsyncOpenAI:
         if self._client is None:
-            self._client = OpenAIModelInvoker(AsyncOpenAI())
+            self._client = AsyncOpenAI()
         return self._client
 
 
@@ -354,7 +277,7 @@ class ConvertedTools:
 class Converter:
     @classmethod
     def convert_tool_choice(
-            cls, tool_choice: Literal["auto", "required", "none"] | str | None
+        cls, tool_choice: Literal["auto", "required", "none"] | str | None
     ) -> response_create_params.ToolChoice | NotGiven:
         if tool_choice is None:
             return NOT_GIVEN
@@ -384,7 +307,7 @@ class Converter:
 
     @classmethod
     def get_response_format(
-            cls, output_schema: AgentOutputSchemaBase | None
+        cls, output_schema: AgentOutputSchemaBase | None
     ) -> ResponseTextConfigParam | NotGiven:
         if output_schema is None or output_schema.is_plain_text():
             return NOT_GIVEN
@@ -400,9 +323,9 @@ class Converter:
 
     @classmethod
     def convert_tools(
-            cls,
-            tools: list[Tool],
-            handoffs: list[Handoff[Any]],
+        cls,
+        tools: list[Tool],
+        handoffs: list[Handoff[Any]],
     ) -> ConvertedTools:
         converted_tools: list[ToolParam] = []
         includes: list[IncludeLiteral] = []

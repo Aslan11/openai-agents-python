@@ -1,51 +1,49 @@
 from __future__ import annotations
 
-from datetime import timedelta
-from idlelib.query import Query
-from typing import Union, Optional, List, Literal, Iterable, Callable, Any
-from wsgiref.headers import Headers
-
-import httpx
-from fastapi import Body
-from openai import NotGiven, NOT_GIVEN, AsyncStream
-from openai.types import ResponsesModel, Metadata, Reasoning
-from openai.types.responses import ResponseInputParam, ResponseIncludable, ResponseTextConfigParam, \
-    response_create_params, ToolParam, Response, ResponseStreamEvent
 from temporalio import workflow
 
-from agents.function_schema import function_schema
-from agents.models.openai_provider import DEFAULT_MODEL
-from agents.models.openai_responses import OpenAIInvoker
-from examples.temporal.adapters.model_activity import OpenAIActivityInput, invoke_open_ai_model
-
 with workflow.unsafe.imports_passed_through():
+    from datetime import timedelta
+    from idlelib.query import Query
+    from typing import Union, Optional, List, Literal, Iterable, Callable, Any
+    from wsgiref.headers import Headers
+    from agents.function_schema import function_schema
+    from agents.models.openai_provider import DEFAULT_MODEL
+    from examples.temporal.adapters.model_activity import OpenAIActivityInput, invoke_open_ai_model
     from agents import ModelProvider, Model, OpenAIResponsesModel, Tool, RunContextWrapper, FunctionTool
+    import httpx
+    from fastapi import Body
+    from openai import NotGiven, NOT_GIVEN, AsyncStream, AsyncOpenAI
+    from openai.types import ResponsesModel, Metadata, Reasoning
+    from openai.types.responses import ResponseInputParam, ResponseIncludable, ResponseTextConfigParam, \
+        response_create_params, ToolParam, Response, ResponseStreamEvent
 
 
-class _OpenAIActivityInvoker(OpenAIInvoker):
-
-    async def create(self, *,
-                     input: Union[str, ResponseInputParam],
-                     model: ResponsesModel,
-                     include: Optional[List[ResponseIncludable]] | NotGiven = NOT_GIVEN,
-                     instructions: Optional[str] | NotGiven = NOT_GIVEN,
-                     max_output_tokens: Optional[int] | NotGiven = NOT_GIVEN,
-                     metadata: Optional[Metadata] | NotGiven = NOT_GIVEN,
-                     parallel_tool_calls: Optional[bool] | NotGiven = NOT_GIVEN,
-                     previous_response_id: Optional[str] | NotGiven = NOT_GIVEN,
-                     reasoning: Optional[Reasoning] | NotGiven = NOT_GIVEN,
-                     service_tier: Optional[Literal["auto", "default", "flex"]] | NotGiven = NOT_GIVEN,
-                     store: Optional[bool] | NotGiven = NOT_GIVEN,
-                     stream: Optional[Literal[False]] | Literal[True] | NotGiven = NOT_GIVEN,
-                     temperature: Optional[float] | NotGiven = NOT_GIVEN,
-                     text: ResponseTextConfigParam | NotGiven = NOT_GIVEN,
-                     tool_choice: response_create_params.ToolChoice | NotGiven = NOT_GIVEN,
-                     tools: Iterable[ToolParam] | NotGiven = NOT_GIVEN, top_p: Optional[float] | NotGiven = NOT_GIVEN,
-                     truncation: Optional[Literal["auto", "disabled"]] | NotGiven = NOT_GIVEN,
-                     user: str | NotGiven = NOT_GIVEN, extra_headers: Headers | None = None,
-                     extra_query: Query | None = None, extra_body: Body | None = None,
-                     timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN) -> Response | AsyncStream[
-        ResponseStreamEvent]:
+def monkey_patch_open_ai_client_create(client: AsyncOpenAI) -> AsyncOpenAI:
+    async def open_ai_client_create(self, *,
+                                    input: Union[str, ResponseInputParam],
+                                    model: ResponsesModel,
+                                    include: Optional[List[ResponseIncludable]] | NotGiven = NOT_GIVEN,
+                                    instructions: Optional[str] | NotGiven = NOT_GIVEN,
+                                    max_output_tokens: Optional[int] | NotGiven = NOT_GIVEN,
+                                    metadata: Optional[Metadata] | NotGiven = NOT_GIVEN,
+                                    parallel_tool_calls: Optional[bool] | NotGiven = NOT_GIVEN,
+                                    previous_response_id: Optional[str] | NotGiven = NOT_GIVEN,
+                                    reasoning: Optional[Reasoning] | NotGiven = NOT_GIVEN,
+                                    service_tier: Optional[Literal["auto", "default", "flex"]] | NotGiven = NOT_GIVEN,
+                                    store: Optional[bool] | NotGiven = NOT_GIVEN,
+                                    stream: Optional[Literal[False]] | Literal[True] | NotGiven = NOT_GIVEN,
+                                    temperature: Optional[float] | NotGiven = NOT_GIVEN,
+                                    text: ResponseTextConfigParam | NotGiven = NOT_GIVEN,
+                                    tool_choice: response_create_params.ToolChoice | NotGiven = NOT_GIVEN,
+                                    tools: Iterable[ToolParam] | NotGiven = NOT_GIVEN,
+                                    top_p: Optional[float] | NotGiven = NOT_GIVEN,
+                                    truncation: Optional[Literal["auto", "disabled"]] | NotGiven = NOT_GIVEN,
+                                    user: str | NotGiven = NOT_GIVEN, extra_headers: Headers | None = None,
+                                    extra_query: Query | None = None, extra_body: Body | None = None,
+                                    timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN) -> Response | \
+                                                                                                     AsyncStream[
+                                                                                                         ResponseStreamEvent]:
         def get_summary(input: Any) -> str:
             ### Activity summary shown in the UI
             try:
@@ -72,15 +70,21 @@ class _OpenAIActivityInvoker(OpenAIInvoker):
         return await workflow.execute_activity(
             invoke_open_ai_model, activity_input,
             start_to_close_timeout=timedelta(seconds=60),
+            heartbeat_timeout=timedelta(seconds=5),
             summary=get_summary(input)
         )
+
+    client.responses.create = open_ai_client_create.__get__(client.responses,
+                                                            type(client.responses))  # Bind to instance
+    return client
 
 
 class ModelStubProvider(ModelProvider):
     def get_model(self, model_name: str | None) -> Model:
         if model_name is None:
             model_name = DEFAULT_MODEL
-        return OpenAIResponsesModel(model_name, _OpenAIActivityInvoker())
+        client = AsyncOpenAI()
+        return OpenAIResponsesModel(model_name, monkey_patch_open_ai_client_create(client))
 
 
 def activity_as_tool(activity: Callable[..., Any]) -> Tool:

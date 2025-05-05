@@ -7,7 +7,7 @@ with workflow.unsafe.imports_passed_through():
     from examples.temporal.adapters.activity_model import ModelStubProvider
 
 
-@workflow.defn
+@workflow.defn(sandboxed=False)
 class HelloWorldAgent:
     @workflow.run
     async def run(self, prompt: str) -> str:

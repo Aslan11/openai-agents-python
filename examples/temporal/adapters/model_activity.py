@@ -9,6 +9,8 @@ from openai.types.responses import ResponseInputParam, ResponseIncludable, Respo
 
 from temporalio import activity
 
+from examples.temporal.adapters.heartbeat_decorator import auto_heartbeater
+
 
 class OpenAIActivityInput(TypedDict, total=False):
     input: Union[str, ResponseInputParam]
@@ -37,6 +39,7 @@ class OpenAIActivityInput(TypedDict, total=False):
 
 
 @activity.defn
+@auto_heartbeater
 async def invoke_open_ai_model(input: OpenAIActivityInput) -> Response:
     client = AsyncOpenAI()
     return await client.responses.create(**input)
